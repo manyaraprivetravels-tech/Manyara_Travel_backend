@@ -32,7 +32,6 @@ app = FastAPI(title="Travel Website API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://manyara-travel-frontend-nine.vercel.app",
         "http://localhost:5173",
     ],
     allow_credentials=True,
