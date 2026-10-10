@@ -22,7 +22,7 @@ from app.routes import (
     seasoned_routes
 )
 
-
+#    "https://manyara-travel-frontend.vercel.app",
 # Development/simple deployment approach.
 # In production, prefer Alembic migrations.
 Base.metadata.create_all(bind=engine)
@@ -32,7 +32,7 @@ app = FastAPI(title="Travel Website API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://manyara-travel-frontend.vercel.app",
+
         "http://localhost:5173",
     ],
     allow_credentials=True,
