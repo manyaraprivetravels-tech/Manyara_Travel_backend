@@ -104,6 +104,13 @@ class SiteSettings(Base):
         nullable=True,
     )
 
+    email_address = Column(
+    String(255),
+    nullable=True,
+    )
+
+
+
     company_address = Column(
         Text,
         nullable=True,

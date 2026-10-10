@@ -55,22 +55,7 @@ def _place_in_order(
     category: str,
     exclude_id: Optional[int] = None,
 ) -> None:
-    """
-    Put `item` at position `new_order` inside `category` and
-    renumber ALL FAQs of that category 1..n.
-
-    - Fixes duplicate / zero display_order values automatically.
-    - new_order empty / 0 / beyond the end -> the item goes last.
-    - exclude_id: pass item.id when the item already exists in the DB,
-      so it is not counted twice.
-
-    Examples (unique orders 1..5 in one category):
-        move 5 -> 2 : old 2, 3, 4 become 3, 4, 5
-        move 2 -> 5 : old 3, 4, 5 become 2, 3, 4
-
-    Call this BEFORE db.commit() so the reorder and the save
-    happen in one transaction.
-    """
+  
 
     query = db.query(FAQ).filter(FAQ.category == category)
 
@@ -361,198 +346,25 @@ def renumber_display_orders(db: Session) -> int:
     return db.query(FAQ).count()
 
 
+def rename_category(db: Session, old: str, new: str) -> int:
+    """
+    One-time utility: move every FAQ from one category to another
+    and renumber the target category 1..n.
+    Returns the number of FAQs moved.
+    """
 
+    moved = (
+        db.query(FAQ)
+        .filter(FAQ.category == old)
+        .update({FAQ.category: new}, synchronize_session=False)
+    )
 
+    db.flush()
 
+    _normalize_category(db, new)
 
+    db.commit()
 
+    _invalidate_cache()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# from sqlalchemy.orm import Session
-# from fastapi import HTTPException
-
-# from app.models.faq import FAQ
-# from app.schemas.faq import FAQCreate, FAQUpdate
-# from app.core.redis_client import (
-#     cache_get,
-#     cache_set,
-#     cache_delete_pattern,
-# )
-
-# CACHE_PREFIX = "faqs"
-
-
-# def _serialize(f: FAQ) -> dict:
-#     return {
-#         "id": f.id,
-#         "question": f.question,
-#         "answer": f.answer,
-#         "category": f.category,
-#         "display_order": f.display_order,
-#         "status": f.status,
-#         "created_by": f.created_by,
-#         "created_at": (
-#             f.created_at.isoformat()
-#             if f.created_at
-#             else None
-#         ),
-#     }
-
-
-# def _invalidate_cache() -> None:
-#     cache_delete_pattern(f"{CACHE_PREFIX}:*")
-
-
-# # ============================================================
-# # PUBLIC FAQs
-# # ============================================================
-
-# def get_all_faqs(
-#     db: Session,
-#     category: str | None = None,
-# ) -> list[dict]:
-#     """
-#     Return published FAQs only.
-
-#     If a category is supplied, return only published FAQs
-#     belonging to that category.
-#     """
-
-#     cache_key = (
-#         f"{CACHE_PREFIX}:{category}"
-#         if category
-#         else f"{CACHE_PREFIX}:all"
-#     )
-
-#     cached = cache_get(cache_key)
-
-#     if cached is not None:
-#         return cached
-
-#     query = (
-#         db.query(FAQ)
-#         .filter(FAQ.status == "published")
-#     )
-
-#     if category:
-#         query = query.filter(
-#             FAQ.category == category
-#         )
-
-#     items = (
-#         query
-#         .order_by(FAQ.display_order.asc(), FAQ.id.asc())
-#         .all()
-#     )
-
-#     data = [_serialize(f) for f in items]
-
-#     cache_set(cache_key, data)
-
-#     return data
-
-
-# # ============================================================
-# # ADMIN — CREATE
-# # ============================================================
-
-# def create_faq(
-#     db: Session,
-#     payload: FAQCreate,
-#     user_id: int,
-# ) -> FAQ:
-#     item = FAQ(
-#         **payload.model_dump(),
-#         created_by=user_id,
-#     )
-
-#     db.add(item)
-#     db.commit()
-#     db.refresh(item)
-
-#     _invalidate_cache()
-
-#     return item
-
-
-# # ============================================================
-# # ADMIN — UPDATE
-# # ============================================================
-
-# def update_faq(
-#     db: Session,
-#     item_id: int,
-#     payload: FAQUpdate,
-# ) -> FAQ:
-#     item = (
-#         db.query(FAQ)
-#         .filter(FAQ.id == item_id)
-#         .first()
-#     )
-
-#     if not item:
-#         raise HTTPException(
-#             status_code=404,
-#             detail="FAQ not found",
-#         )
-
-#     update_data = payload.model_dump(
-#         exclude_unset=True
-#     )
-
-#     for field, value in update_data.items():
-#         setattr(item, field, value)
-
-#     db.commit()
-#     db.refresh(item)
-
-#     _invalidate_cache()
-
-#     return item
-
-
-# # ============================================================
-# # ADMIN — DELETE
-# # ============================================================
-
-# def delete_faq(
-#     db: Session,
-#     item_id: int,
-# ) -> None:
-#     item = (
-#         db.query(FAQ)
-#         .filter(FAQ.id == item_id)
-#         .first()
-#     )
-
-#     if not item:
-#         raise HTTPException(
-#             status_code=404,
-#             detail="FAQ not found",
-#         )
-
-#     db.delete(item)
-#     db.commit()
-
-#     _invalidate_cache()
+    return moved

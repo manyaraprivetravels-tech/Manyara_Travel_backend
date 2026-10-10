@@ -15,6 +15,8 @@ class SiteSettingsUpdate(BaseModel):
     homepage_headline: Optional[str] = None
     trust_line: Optional[str] = None
 
+    email_address: Optional[str] | None = None
+
     # ============================================================
     # Top Info Bar
     # ============================================================
@@ -73,6 +75,7 @@ class SiteSettingsOut(BaseModel):
     offer_banner_text: Optional[str]
     homepage_headline: Optional[str]
     trust_line: Optional[str]
+    email_address: Optional[str] | None = None
 
     # ============================================================
     # Top Info Bar

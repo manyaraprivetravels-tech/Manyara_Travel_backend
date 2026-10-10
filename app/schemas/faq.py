@@ -15,7 +15,7 @@ FAQCategory = Literal[
     "general",
     "packages",
     "most_visited",
-    "batches",
+    "seasonal",
     "reviews",
     "about",
     "blogs",
