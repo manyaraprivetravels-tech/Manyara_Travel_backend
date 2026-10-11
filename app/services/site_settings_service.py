@@ -1,4 +1,3 @@
-
 from sqlalchemy.orm import Session
 
 from app.models.site_settings import SiteSettings
@@ -10,7 +9,13 @@ from app.core.redis_client import (
     cache_delete,
 )
 
-CACHE_KEY = "site_settings:singleton"
+# v2: the cached payload gained show_address_landmark and lost the featured
+# lists, so a new key stops any old cached copy from being served.
+CACHE_KEY = "site_settings:singleton:v2"
+
+# Columns that are NOT NULL in the database. If the client ever sends null for
+# one of these, it is ignored instead of crashing the update.
+NON_NULLABLE_FIELDS = {"top_bar_enabled", "show_address_landmark"}
 
 
 def _get_or_create_row(db: Session) -> SiteSettings:
@@ -38,6 +43,7 @@ def _get_or_create_row(db: Session) -> SiteSettings:
             phone_number=None,
             whatsapp_number=app_settings.WHATSAPP_NUMBER,
             company_address=None,
+            show_address_landmark=False,
             address_url=None,
 
             # ====================================================
@@ -69,12 +75,6 @@ def _get_or_create_row(db: Session) -> SiteSettings:
 
             top_bar_social_4_name=None,
             top_bar_social_4_url=None,
-
-            # ====================================================
-            # Homepage featured collections
-            # ====================================================
-            featured_international=[],
-            featured_national=[],
         )
 
         db.add(row)
@@ -134,17 +134,8 @@ def get_settings(db: Session) -> dict:
         "phone_number": row.phone_number,
         "whatsapp_number": row.whatsapp_number,
         "company_address": row.company_address,
+        "show_address_landmark": bool(row.show_address_landmark),
         "address_url": row.address_url,
-
-        # ========================================================
-        # Homepage featured collections
-        # ========================================================
-        "featured_international": (
-            row.featured_international or []
-        ),
-        "featured_national": (
-            row.featured_national or []
-        ),
 
         # ========================================================
         # Metadata
@@ -174,6 +165,10 @@ def update_settings(
     update_data = payload.model_dump(exclude_unset=True)
 
     for field, value in update_data.items():
+        # Never write null into a NOT NULL column.
+        if value is None and field in NON_NULLABLE_FIELDS:
+            continue
+
         setattr(row, field, value)
 
     db.commit()

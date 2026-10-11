@@ -1,5 +1,3 @@
-
-
 from datetime import datetime
 from typing import Optional
 
@@ -14,8 +12,6 @@ class SiteSettingsUpdate(BaseModel):
     offer_banner_text: Optional[str] = None
     homepage_headline: Optional[str] = None
     trust_line: Optional[str] = None
-
-    email_address: Optional[str] | None = None
 
     # ============================================================
     # Top Info Bar
@@ -32,37 +28,33 @@ class SiteSettingsUpdate(BaseModel):
     # Example: 5000+ successful travelers
     top_bar_traveller_text: Optional[str] = None
 
-    # Social media link 1
-    # Example: Instagram + Instagram profile URL
+    # Social media links 1-4 (platform name + profile URL)
     top_bar_social_1_name: Optional[str] = None
     top_bar_social_1_url: Optional[str] = None
 
-    # Social media link 2
-    # Example: YouTube + YouTube channel URL
     top_bar_social_2_name: Optional[str] = None
     top_bar_social_2_url: Optional[str] = None
 
     top_bar_social_3_name: Optional[str] = None
-    top_bar_social_3_url:  Optional[str] = None
+    top_bar_social_3_url: Optional[str] = None
 
     top_bar_social_4_name: Optional[str] = None
-    top_bar_social_4_url:  Optional[str] = None
+    top_bar_social_4_url: Optional[str] = None
 
     # ============================================================
     # Contact information
     # ============================================================
 
+    email_address: Optional[str] = None
     phone_number: Optional[str] = None
     whatsapp_number: Optional[str] = None
     company_address: Optional[str] = None
+
+    # Show the landmark note under the address (Contact section + footer).
+    # None = not sent, so the saved value is left unchanged.
+    show_address_landmark: Optional[bool] = None
+
     address_url: Optional[str] = None
-
-    # ============================================================
-    # Homepage featured collections
-    # ============================================================
-
-    featured_international: Optional[list[str]] = None
-    featured_national: Optional[list[str]] = None
 
 
 class SiteSettingsOut(BaseModel):
@@ -72,52 +64,46 @@ class SiteSettingsOut(BaseModel):
     # Website / marketing settings
     # ============================================================
 
-    offer_banner_text: Optional[str]
-    homepage_headline: Optional[str]
-    trust_line: Optional[str]
-    email_address: Optional[str] | None = None
+    offer_banner_text: Optional[str] = None
+    homepage_headline: Optional[str] = None
+    trust_line: Optional[str] = None
 
     # ============================================================
     # Top Info Bar
     # ============================================================
 
-    top_bar_enabled: Optional[bool]
+    top_bar_enabled: Optional[bool] = None
 
-    top_bar_location_1: Optional[str]
-    top_bar_location_2: Optional[str]
+    top_bar_location_1: Optional[str] = None
+    top_bar_location_2: Optional[str] = None
 
-    top_bar_traveller_text: Optional[str]
+    top_bar_traveller_text: Optional[str] = None
 
-    top_bar_social_1_name: Optional[str]
-    top_bar_social_1_url: Optional[str]
+    top_bar_social_1_name: Optional[str] = None
+    top_bar_social_1_url: Optional[str] = None
 
-    top_bar_social_2_name: Optional[str]
-    top_bar_social_2_url: Optional[str]
+    top_bar_social_2_name: Optional[str] = None
+    top_bar_social_2_url: Optional[str] = None
 
     top_bar_social_3_name: Optional[str] = None
-    top_bar_social_3_url:  Optional[str] = None
-    
+    top_bar_social_3_url: Optional[str] = None
+
     top_bar_social_4_name: Optional[str] = None
-    top_bar_social_4_url:  Optional[str] = None
+    top_bar_social_4_url: Optional[str] = None
 
     # ============================================================
     # Contact information
     # ============================================================
 
-    phone_number: Optional[str]
-    whatsapp_number: Optional[str]
-    company_address: Optional[str]
-    address_url: Optional[str]
-
-    # ============================================================
-    # Homepage featured collections
-    # ============================================================
-
-    featured_international: Optional[list[str]]
-    featured_national: Optional[list[str]]
+    email_address: Optional[str] = None
+    phone_number: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    company_address: Optional[str] = None
+    show_address_landmark: bool = False
+    address_url: Optional[str] = None
 
     # ============================================================
     # Metadata
     # ============================================================
 
-    updated_at: Optional[datetime]
+    updated_at: Optional[datetime] = None
