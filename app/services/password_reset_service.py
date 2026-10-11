@@ -2,9 +2,10 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import HTTPException, status
+from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.email import send_password_reset_email
 from app.core.security import hash_password
 
@@ -16,8 +17,6 @@ from app.schemas.password_reset import (
     VerifyResetCodeRequest,
     ResetPasswordRequest,
 )
-
-OTP_EXPIRY_MINUTES = 2
 
 
 def _hash_token(token: str) -> str:
@@ -39,9 +38,11 @@ def _get_current_time() -> datetime:
 def forgot_password(
     db: Session,
     payload: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
 ) -> None:
 
-    user = db.query(User).filter(User.email == payload.email).first()
+    email = payload.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
 
     # Do not reveal whether email exists.
     if not user or not user.is_active:
@@ -58,33 +59,23 @@ def forgot_password(
 
     otp = _generate_otp()
 
-    otp_hash = _hash_token(otp)
-
-    expires_at = _get_current_time() + timedelta(minutes=OTP_EXPIRY_MINUTES)
-
     reset_token = PasswordResetToken(
         user_id=user.id,
-        token_hash=otp_hash,
-        expires_at=expires_at,
+        token_hash=_hash_token(otp),
+        expires_at=_get_current_time()
+        + timedelta(minutes=settings.OTP_EXPIRY_MINUTES),
         used=False,
     )
 
     db.add(reset_token)
     db.commit()
 
-    try:
-        send_password_reset_email(
-            recipient_email=user.email,
-            otp=otp,
-        )
-
-    except Exception:
-        db.rollback()
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Unable to send password reset email",
-        )
+    # Sent after the response, so the page never waits on email.
+    background_tasks.add_task(
+        send_password_reset_email,
+        recipient_email=user.email,
+        otp=otp,
+    )
 
 
 def verify_reset_code(
@@ -92,7 +83,8 @@ def verify_reset_code(
     payload: VerifyResetCodeRequest,
 ) -> str:
 
-    user = db.query(User).filter(User.email == payload.email).first()
+    email = payload.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
 
     if not user or not user.is_active:
         raise HTTPException(
@@ -122,7 +114,6 @@ def verify_reset_code(
     now = _get_current_time()
 
     expires_at = reset_record.expires_at
-
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
@@ -135,20 +126,13 @@ def verify_reset_code(
             detail="Verification code has expired",
         )
 
-    # Mark OTP as consumed.
-    reset_record.used = True
-
-    # Generate a separate reset token.
+    # Swap the OTP for a separate reset token (same record, new hash).
     reset_token = _generate_reset_token()
 
-    reset_token_hash = _hash_token(reset_token)
-
-    reset_record.token_hash = reset_token_hash
-
-    # Give the reset session another short validity period.
-    reset_record.expires_at = now + timedelta(minutes=10)
-
-    # It remains associated with the same user.
+    reset_record.token_hash = _hash_token(reset_token)
+    reset_record.expires_at = now + timedelta(
+        minutes=settings.RESET_SESSION_EXPIRY_MINUTES
+    )
     reset_record.used = False
 
     db.commit()
@@ -187,7 +171,6 @@ def reset_password(
     now = _get_current_time()
 
     expires_at = reset_record.expires_at
-
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 

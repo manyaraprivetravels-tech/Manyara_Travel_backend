@@ -22,18 +22,22 @@ from app.routes import (
     seasoned_routes
 )
 
+import logging 
 
-# Development/simple deployment approach.
-# In production, prefer Alembic migrations.
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Travel Website API")
 
+#"https://manyara-travel-frontend.vercel.app",
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://manyara-travel-frontend.vercel.app",
-        #"http://localhost:5173",
+        
+        "http://localhost:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],

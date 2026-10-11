@@ -39,20 +39,34 @@ class Settings(BaseSettings):
     WHATSAPP_NUMBER: str = ""
     SITE_URL: str = "https://manyaraprive.com"
 
-    OTP_EXPIRY_MINUTES: int = 5
     RESET_SESSION_EXPIRY_MINUTES: int = 10
 
-    # Email message settings
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
-    SMTP_USERNAME: str
-    SMTP_PASSWORD: str
-    #Manyara backend
-    SMTP_USE_TLS: bool = True
+    RESEND_API_KEY: str
     EMAIL_FROM: str
+    EMAIL_REPLY_TO: str | None = None
+
+    OTP_EXPIRY_MINUTES: int = 5
+
+
 
     class Config:
         env_file = ".env"
 
 
 settings = Settings()
+
+
+
+
+
+
+
+
+    # # Email message settings
+    # SMTP_HOST: str = "smtp.gmail.com"
+    # SMTP_PORT: int = 587
+    # SMTP_USERNAME: str
+    # SMTP_PASSWORD: str
+    # #Manyara backend
+    # SMTP_USE_TLS: bool = True
+    # EMAIL_FROM: str
