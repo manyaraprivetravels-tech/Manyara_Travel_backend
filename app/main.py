@@ -32,12 +32,10 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Travel Website API")
 
-#"https://manyara-travel-frontend.vercel.app",
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        
-        "http://localhost:5173",
+        "https://manyara-travel-frontend.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
