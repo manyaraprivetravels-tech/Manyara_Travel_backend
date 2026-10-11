@@ -36,6 +36,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://manyara-travel-frontend.vercel.app",
+        "https://manyaraprivevacations.com",
+        "https://www.manyaraprivevacations.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
