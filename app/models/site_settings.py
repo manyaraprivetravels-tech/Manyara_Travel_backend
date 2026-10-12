@@ -75,6 +75,8 @@ class SiteSettings(Base):
         server_default=text("0"),
     )
 
+    address_landmark = Column(String(200), nullable=True)
+
     address_url = Column(String(500), nullable=True)
 
     # ============================================================

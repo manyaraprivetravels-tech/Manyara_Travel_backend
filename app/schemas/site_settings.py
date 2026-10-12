@@ -52,6 +52,7 @@ class SiteSettingsUpdate(BaseModel):
 
     # Show the landmark note under the address (Contact section + footer).
     # None = not sent, so the saved value is left unchanged.
+    address_landmark: Optional[str] = None
     show_address_landmark: Optional[bool] = None
 
     address_url: Optional[str] = None
@@ -99,6 +100,7 @@ class SiteSettingsOut(BaseModel):
     phone_number: Optional[str] = None
     whatsapp_number: Optional[str] = None
     company_address: Optional[str] = None
+    address_landmark: Optional[str] = None
     show_address_landmark: bool = False
     address_url: Optional[str] = None
 
@@ -107,3 +109,4 @@ class SiteSettingsOut(BaseModel):
     # ============================================================
 
     updated_at: Optional[datetime] = None
+    

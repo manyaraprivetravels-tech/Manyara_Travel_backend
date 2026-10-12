@@ -9,9 +9,9 @@ from app.core.redis_client import (
     cache_delete,
 )
 
-# v2: the cached payload gained show_address_landmark and lost the featured
-# lists, so a new key stops any old cached copy from being served.
-CACHE_KEY = "site_settings:singleton:v2"
+# v3: the cached payload gained address_landmark, so a new key stops any
+# old cached copy from being served.
+CACHE_KEY = "site_settings:singleton:v3"
 
 # Columns that are NOT NULL in the database. If the client ever sends null for
 # one of these, it is ignored instead of crashing the update.
@@ -43,6 +43,7 @@ def _get_or_create_row(db: Session) -> SiteSettings:
             phone_number=None,
             whatsapp_number=app_settings.WHATSAPP_NUMBER,
             company_address=None,
+            address_landmark=None,
             show_address_landmark=False,
             address_url=None,
 
@@ -134,6 +135,7 @@ def get_settings(db: Session) -> dict:
         "phone_number": row.phone_number,
         "whatsapp_number": row.whatsapp_number,
         "company_address": row.company_address,
+        "address_landmark": row.address_landmark,
         "show_address_landmark": bool(row.show_address_landmark),
         "address_url": row.address_url,
 
