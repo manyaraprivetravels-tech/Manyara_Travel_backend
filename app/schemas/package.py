@@ -493,9 +493,19 @@ class PackageOut(BaseModel):
 
 
 
+# =========================================================
+# ADMIN LIST (PAGINATED) + STATS
+# =========================================================
 
+class PackageListOut(BaseModel):
+      items: list[PackageOut]
+      total: int
 
-
+class PackageStatsOut(BaseModel):
+      total: int
+      published: int
+      draft: int
+      featured: int
 
 
 
