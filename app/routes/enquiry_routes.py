@@ -1,17 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+
 
 from app.db.database import get_db
 from app.schemas.enquiry import (
     EnquiryCreate,
     EnquiryResponse,
+    EnquiryListOut,
+    EnquiryStatsOut
 )
+
 from app.services.enquiry_service import (
     create_enquiry,
     get_all_enquiries,
+    get_enquiries_admin_paged,
+    get_enquiry_stats_admin,
     get_enquiry_by_id,
     delete_enquiry,
 )
+
 from app.core.deps import require_admin_or_creator
 
 router = APIRouter(
@@ -57,8 +66,76 @@ def get_admin_enquiries(
 
 
 # =========================================================
+# ADMIN - PAGINATED LIST
+# =========================================================
+
+
+@router.get(
+    "/admin/paged",
+    response_model=EnquiryListOut,
+    dependencies=[Depends(require_admin_or_creator)],
+)
+def get_admin_enquiries_paged(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=200),
+    search: str | None = Query(default=None, max_length=100),
+    package_type: str | None = Query(default=None, max_length=50),
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="date_from cannot be after date_to",
+        )
+
+    return get_enquiries_admin_paged(
+        db=db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        package_type=package_type,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+
+# =========================================================
+# ADMIN - STATS
+# =========================================================
+
+
+@router.get(
+    "/admin/stats",
+    response_model=EnquiryStatsOut,
+    dependencies=[Depends(require_admin_or_creator)],
+)
+def get_admin_enquiry_stats(
+    db: Session = Depends(get_db),
+):
+    return get_enquiry_stats_admin(db)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# =========================================================
 # ADMIN - GET SINGLE ENQUIRY
 # =========================================================
+
 
 
 @router.get(

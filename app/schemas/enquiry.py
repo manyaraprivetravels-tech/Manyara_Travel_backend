@@ -128,3 +128,18 @@ class EnquiryResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
     )
+
+
+# =========================================================
+# ADMIN LIST (PAGINATED) + STATS
+# =========================================================
+class EnquiryListOut(BaseModel):
+    items: list[EnquiryResponse]
+    total: int
+
+
+class EnquiryStatsOut(BaseModel):
+    total: int
+    last_24h: int
+    last_7_days: int
+    custom: int

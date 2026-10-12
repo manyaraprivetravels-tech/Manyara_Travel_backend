@@ -1,6 +1,10 @@
 
+from datetime import date, datetime, time, timedelta
+from typing import Optional
+
 from fastapi import HTTPException
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session, joinedload, contains_eager
 
 from app.models.enquiry import Enquiry
 from app.models.package import Package
@@ -164,6 +168,145 @@ def get_all_enquiries(
     ]
 
 
+
+def get_enquiries_admin_paged(
+    db: Session,
+    skip: int = 0,
+    limit: int = 10,
+    search: Optional[str] = None,
+    package_type: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+) -> dict:
+    """
+    Admin endpoint (paginated + filtered), newest first.
+
+    Returns {"items": [...], "total": <count after filters>}.
+    """
+
+    # Join Package once: needed for searching by package title,
+    # and contains_eager reuses it to load enquiry.package
+    # (so package_title works without extra queries).
+    query = (
+        db.query(Enquiry)
+        .outerjoin(Package, Enquiry.package_id == Package.id)
+        .options(contains_eager(Enquiry.package))
+    )
+
+    # ---------------------------------------------------------
+    # Search: name, phone, destination, message, package title
+    # ---------------------------------------------------------
+
+    if search and search.strip():
+        like = f"%{search.strip()}%"
+
+        query = query.filter(
+            or_(
+                Enquiry.name.ilike(like),
+                Enquiry.phone.ilike(like),
+                Enquiry.destination.ilike(like),
+                Enquiry.message.ilike(like),
+                Package.title.ilike(like),
+            )
+        )
+
+    # ---------------------------------------------------------
+    # Package type filter (pilgrimage, beach, custom, ...)
+    # ---------------------------------------------------------
+
+    if package_type and package_type != "all":
+        query = query.filter(
+            Enquiry.package_type == package_type.strip().lower()
+        )
+
+    # ---------------------------------------------------------
+    # Date received (created_at), inclusive of both days
+    # ---------------------------------------------------------
+
+    if date_from:
+        query = query.filter(
+            Enquiry.created_at >= datetime.combine(date_from, time.min)
+        )
+
+    if date_to:
+        query = query.filter(
+            Enquiry.created_at
+            < datetime.combine(date_to + timedelta(days=1), time.min)
+        )
+
+    # ---------------------------------------------------------
+    # Total BEFORE offset/limit
+    # ---------------------------------------------------------
+
+    total = query.count()
+
+    items = (
+        query
+        .order_by(
+            Enquiry.created_at.desc(),
+            Enquiry.id.desc(),  # stable tiebreaker for paging
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "items": items,
+        "total": total,
+    }
+
+
+def get_enquiry_stats_admin(db: Session) -> dict:
+    """
+    Counts for the admin summary cards.
+    created_at is stored in UTC, so rolling windows are used
+    instead of "today" to avoid timezone confusion.
+    """
+
+    now = datetime.utcnow()
+
+    total = db.query(func.count(Enquiry.id)).scalar() or 0
+
+    last_24h = (
+        db.query(func.count(Enquiry.id))
+        .filter(Enquiry.created_at >= now - timedelta(hours=24))
+        .scalar()
+        or 0
+    )
+
+    last_7_days = (
+        db.query(func.count(Enquiry.id))
+        .filter(Enquiry.created_at >= now - timedelta(days=7))
+        .scalar()
+        or 0
+    )
+
+    custom = (
+        db.query(func.count(Enquiry.id))
+        .filter(Enquiry.package_type == "custom")
+        .scalar()
+        or 0
+    )
+
+    return {
+        "total": total,
+        "last_24h": last_24h,
+        "last_7_days": last_7_days,
+        "custom": custom,
+    }
+
+
+
+
+
+
+
+
+
+
+
+
 def get_enquiry_by_id(
     db: Session,
     enquiry_id: int,
@@ -177,6 +320,7 @@ def get_enquiry_by_id(
         .filter(Enquiry.id == enquiry_id)
         .first()
     )
+
 
 
 def delete_enquiry(
