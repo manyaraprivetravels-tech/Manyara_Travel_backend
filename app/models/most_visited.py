@@ -82,10 +82,29 @@ class MostVisited(Base):
     # RELATIONSHIP WITH PACKAGES
     # --------------------------------------------------
 
-    packages = relationship(
-        "Package",
-        back_populates="destination_obj",
-    )
+   # model
+    packages = relationship("Package", back_populates="destination_obj", passive_deletes="all")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# # service: check first, give a useful message
+# count = db.query(Package).filter(Package.destination_id == item_id).count()
+# if count:
+#     raise HTTPException(400, f"Cannot delete: {count} package(s) are linked to this destination.")
 
 
 

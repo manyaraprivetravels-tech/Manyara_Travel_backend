@@ -1,9 +1,6 @@
 
-# if (isEditingExisting) {
-#   delete payload.slug;
-#   await updateSeasonedDestination(editing.id, payload);
-# }
 
+from sqlalchemy import func,or_ 
 from typing import Optional
 
 from fastapi import HTTPException
@@ -482,6 +479,97 @@ def get_all_seasoned_destinations_admin(
         for destination in destinations
     ]
 
+# ============================================================
+# ADMIN — PAGINATED LIST + STATS
+# ============================================================
+
+
+def _escape_like(value: str) -> str:
+    """Escape % and _ so they are searched literally."""
+    return (
+        value.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+
+
+def get_seasoned_destinations_admin_paged(
+    db: Session,
+    skip: int = 0,
+    limit: int = 10,
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+) -> dict:
+    """
+    Admin endpoint (paginated + filtered).
+
+    Returns {"items": [...], "total": <count after filters>}.
+    Packages are NOT loaded here (the list doesn't need them),
+    so there is no N+1 and the response stays light.
+    """
+
+    query = db.query(SeasonedDestination)
+
+    # Search by place name or season label
+    if search and search.strip():
+        term = f"%{_escape_like(search.strip())}%"
+        query = query.filter(
+            or_(
+                SeasonedDestination.place_name.ilike(term, escape="\\"),
+                SeasonedDestination.season_label.ilike(term, escape="\\"),
+            )
+        )
+
+    # Status filter ("all" / None = no filter)
+    if status and status != "all":
+        if status not in ("draft", "published"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid status filter",
+            )
+        query = query.filter(SeasonedDestination.status == status)
+
+    # Total BEFORE offset/limit
+    total = query.count()
+
+    items = (
+        query.order_by(
+            SeasonedDestination.display_order.asc(),
+            SeasonedDestination.created_at.desc(),
+            SeasonedDestination.id.desc(),  # stable tiebreaker for paging
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return {"items": items, "total": total}
+
+
+def get_seasoned_destinations_stats_admin(db: Session) -> dict:
+    """
+    Counts for the admin summary cards.
+    """
+
+    rows = (
+        db.query(
+            SeasonedDestination.status,
+            func.count(SeasonedDestination.id),
+        )
+        .group_by(SeasonedDestination.status)
+        .all()
+    )
+
+    counts = {str(s): c for s, c in rows}
+
+    published = counts.get("published", 0)
+    draft = counts.get("draft", 0)
+
+    return {
+        "total": published + draft,
+        "published": published,
+        "draft": draft,
+    }
 
 # ============================================================
 # CREATE SEASONED DESTINATION

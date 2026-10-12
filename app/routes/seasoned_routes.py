@@ -1,7 +1,8 @@
 
 
 
-from fastapi import APIRouter, Depends
+from typing import Literal
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -12,6 +13,8 @@ from app.schemas.seasoned_schema import (
     SeasonedDestinationResponse,
     SeasonedDestinationDetailResponse,
     SeasonedDestinationListResponse,
+    SeasonedDestinationAdminListResponse,
+    SeasonedDestinationStatsResponse
 )
 
 from app.services import seasoned_service
@@ -90,23 +93,6 @@ def get_seasoned_destination_by_slug(
     )
 
 
-# ============================================================
-# ADMIN / CREATOR ROUTES
-# ============================================================
-
-# IMPORTANT:
-#
-# Keep /admin/* routes before /{slug}
-# so admin routes are never interpreted as a
-# public seasoned destination slug.
-#
-# The routes below are protected by
-# require_admin_or_creator.
-
-
-# ------------------------------------------------------------
-# ADMIN — GET ALL SEASONED DESTINATIONS
-# ------------------------------------------------------------
 
 
 @router.get(
@@ -196,6 +182,34 @@ def create_seasoned_destination(
         current_user.id,
     )
 
+
+
+@router.get(
+    "/admin/paged",
+    response_model=SeasonedDestinationAdminListResponse,
+    dependencies=[Depends(require_admin_or_creator)],
+)
+def list_seasoned_destinations_admin_paged(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=200),
+    search: str | None = Query(default=None, max_length=100),
+    status: Literal["all", "draft", "published"] | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Paginated admin list (draft + published). Returns { items, total }."""
+    return seasoned_service.get_seasoned_destinations_admin_paged(
+        db, skip=skip, limit=limit, search=search, status=status
+    )
+
+
+@router.get(
+    "/admin/stats",
+    response_model=SeasonedDestinationStatsResponse,
+    dependencies=[Depends(require_admin_or_creator)],
+)
+def get_seasoned_destinations_stats(db: Session = Depends(get_db)):
+    """Counts for the admin summary cards."""
+    return seasoned_service.get_seasoned_destinations_stats_admin(db)
 
 # ------------------------------------------------------------
 # ADMIN — UPDATE SEASONED DESTINATION
