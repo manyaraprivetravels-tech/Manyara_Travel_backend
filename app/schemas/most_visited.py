@@ -244,3 +244,19 @@ class MostVisitedOut(BaseModel):
     packages: list[MostVisitedPackageOut] = Field(
         default_factory=list,
     )
+
+
+# ============================================================
+# ADMIN LIST (PAGINATED) + STATS
+# ============================================================
+
+
+class MostVisitedListOut(BaseModel):
+    items: list[MostVisitedOut]
+    total: int
+
+
+class MostVisitedStatsOut(BaseModel):
+    total: int
+    published: int
+    draft: int

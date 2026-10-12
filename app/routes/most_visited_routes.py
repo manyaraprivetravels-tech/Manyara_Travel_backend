@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query 
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -7,6 +7,8 @@ from app.schemas.most_visited import (
     MostVisitedCreate,
     MostVisitedUpdate,
     MostVisitedOut,
+    MostVisitedListOut,
+    MostVisitedStatsOut
 )
 
 from app.services import most_visited_service
@@ -79,6 +81,58 @@ def get_most_visited_by_slug(
 # ============================================================
 # ADMIN / CREATOR ROUTES
 # ============================================================
+
+# ------------------------------------------------------------
+# ADMIN — PAGINATED LIST
+# ------------------------------------------------------------
+
+
+@router.get(
+    "/admin/paged",
+    response_model=MostVisitedListOut,
+    dependencies=[Depends(require_admin_or_creator)],
+)
+def list_most_visited_admin_paged(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=200),
+    search: str | None = Query(default=None, max_length=100),
+    status: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """
+    Paginated admin list (draft + published).
+    Returns { items: [...], total: N }.
+    """
+
+    return most_visited_service.get_most_visited_admin_paged(
+        db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        status=status,
+    )
+
+
+# ------------------------------------------------------------
+# ADMIN — STATS
+# ------------------------------------------------------------
+
+
+@router.get(
+    "/admin/stats",
+    response_model=MostVisitedStatsOut,
+    dependencies=[Depends(require_admin_or_creator)],
+)
+def get_most_visited_stats(
+    db: Session = Depends(get_db),
+):
+    """
+    Counts for the admin summary cards.
+    """
+
+    return most_visited_service.get_most_visited_stats_admin(db)
+
+
 
 
 # ------------------------------------------------------------
