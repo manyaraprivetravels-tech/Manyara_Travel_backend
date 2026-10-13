@@ -116,6 +116,33 @@ def list_all_seasoned_destinations(
         db,
     )
 
+@router.get(
+    "/admin/paged",
+    response_model=SeasonedDestinationAdminListResponse,
+    dependencies=[Depends(require_admin_or_creator)],
+)
+def list_seasoned_destinations_admin_paged(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=200),
+    search: str | None = Query(default=None, max_length=100),
+    status: Literal["all", "draft", "published"] | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Paginated admin list (draft + published). Returns { items, total }."""
+    return seasoned_service.get_seasoned_destinations_admin_paged(
+        db, skip=skip, limit=limit, search=search, status=status
+    )
+
+
+@router.get(
+    "/admin/stats",
+    response_model=SeasonedDestinationStatsResponse,
+    dependencies=[Depends(require_admin_or_creator)],
+)
+def get_seasoned_destinations_stats(db: Session = Depends(get_db)):
+    """Counts for the admin summary cards."""
+    return seasoned_service.get_seasoned_destinations_stats_admin(db)
+
 
 # ------------------------------------------------------------
 # ADMIN — GET SEASONED DESTINATION BY ID
@@ -184,32 +211,6 @@ def create_seasoned_destination(
 
 
 
-@router.get(
-    "/admin/paged",
-    response_model=SeasonedDestinationAdminListResponse,
-    dependencies=[Depends(require_admin_or_creator)],
-)
-def list_seasoned_destinations_admin_paged(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(10, ge=1, le=200),
-    search: str | None = Query(default=None, max_length=100),
-    status: Literal["all", "draft", "published"] | None = Query(default=None),
-    db: Session = Depends(get_db),
-):
-    """Paginated admin list (draft + published). Returns { items, total }."""
-    return seasoned_service.get_seasoned_destinations_admin_paged(
-        db, skip=skip, limit=limit, search=search, status=status
-    )
-
-
-@router.get(
-    "/admin/stats",
-    response_model=SeasonedDestinationStatsResponse,
-    dependencies=[Depends(require_admin_or_creator)],
-)
-def get_seasoned_destinations_stats(db: Session = Depends(get_db)):
-    """Counts for the admin summary cards."""
-    return seasoned_service.get_seasoned_destinations_stats_admin(db)
 
 # ------------------------------------------------------------
 # ADMIN — UPDATE SEASONED DESTINATION
@@ -226,26 +227,7 @@ def update_seasoned_destination(
     payload: SeasonedDestinationUpdate,
     db: Session = Depends(get_db),
 ):
-    """
-    Update an existing seasoned destination.
-
-    Supported updates include:
-
-        - place_name
-        - slug
-        - image
-        - description
-        - season_label
-        - season_start_date
-        - season_end_date
-        - best_time_to_visit
-        - starting_from
-        - display_order
-        - status
-
-    The service handles slug uniqueness,
-    date validation, ordering, and cache invalidation.
-    """
+    
 
     return seasoned_service.update_seasoned_destination(
         db,
@@ -268,17 +250,7 @@ def delete_seasoned_destination(
     destination_id: int,
     db: Session = Depends(get_db),
 ):
-    """
-    Delete a seasoned destination.
-
-    Before deletion, any packages linked through:
-
-        package.seasoned_destination_id
-
-    are detached by setting the field to NULL.
-
-    Packages themselves are NOT deleted.
-    """
+    
 
     seasoned_service.delete_seasoned_destination(
         db,
@@ -301,18 +273,7 @@ def renumber_seasoned_destinations(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_creator),
 ):
-    """
-    Normalize seasoned destination display_order values.
 
-    The resulting order will be:
-
-        1
-        2
-        3
-        ...
-
-    Returns the number of destinations processed.
-    """
 
     return seasoned_service.renumber_display_orders(
         db,

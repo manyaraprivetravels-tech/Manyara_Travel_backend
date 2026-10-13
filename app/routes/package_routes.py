@@ -32,36 +32,15 @@ router = APIRouter(
     "",
     response_model=list[dict],
 )
+
 def list_published_packages(
-    collection: str | None = Query(
-        default=None,
-        description=(
-            "Optional discovery collection: "
-            "popular, recommended, trending, featured, "
-            "new, most_visited"
-        ),
-    ),
+    collection: str | None = Query(default=None, description="..."),
+    region: str | None = Query(default=None, description="domestic or international"),
+    package_type: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    """
-    Get published packages.
-
-    Optional:
-
-        ?collection=popular
-        ?collection=recommended
-        ?collection=trending
-        ?collection=featured
-        ?collection=new
-        ?collection=most_visited
-
-    A package may also have an optional
-    seasoned_destination_id.
-    """
-
     return package_service.get_published_packages(
-        db,
-        collection=collection,
+        db, collection=collection, region=region, package_type=package_type,
     )
 
 
@@ -94,19 +73,6 @@ def get_package_by_slug(
     )
 
 
-# ============================================================
-# ADMIN / CREATOR ROUTES
-# ============================================================
-
-# IMPORTANT:
-# Keep /admin/* routes BEFORE /{package_id}
-# so "admin" is never interpreted as an integer
-# package ID.
-
-
-# ------------------------------------------------------------
-# ADMIN — GET ALL PACKAGES
-# ------------------------------------------------------------
 
 
 @router.get(
@@ -120,23 +86,15 @@ def list_all_packages(
     search: str | None = Query(default=None, max_length=100),
     status: str | None = Query(default=None),
     package_type: str | None = Query(default=None),
+    region: str | None = Query(default=None),   # add
     db: Session = Depends(get_db),
 ):
-    """
-    Paginated admin/creator list (draft + published).
-
-    Returns { items: [...], total: N } where total is the count
-    AFTER search/status/type filters, ignoring skip/limit.
-    """
-
     return package_service.get_all_packages_admin(
-        db,
-        skip=skip,
-        limit=limit,
-        search=search,
-        status=status,
-        package_type=package_type,
+        db, skip=skip, limit=limit, search=search,
+        status=status, package_type=package_type,
+        region=region,                           # add
     )
+
 
 
 @router.get(
@@ -169,20 +127,7 @@ def create_package(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_creator),
 ):
-    """
-    Create a new package.
 
-    Relationships:
-
-        destination_id
-            -> MostVisited.id
-
-        seasoned_destination_id
-            -> SeasonedDestination.id
-
-    Both relationships are handled and validated
-    by package_service.create_package().
-    """
 
     return package_service.create_package(
         db,
@@ -206,20 +151,7 @@ def update_package(
     payload: PackageUpdate,
     db: Session = Depends(get_db),
 ):
-    """
-    Update an existing package.
 
-    destination_id can be changed.
-
-    seasoned_destination_id can also be:
-
-        - assigned
-        - changed
-        - set to null
-
-    The service validates the corresponding
-    destination relationships.
-    """
 
     return package_service.update_package(
         db,
@@ -254,23 +186,6 @@ def delete_package(
     return None
 
 
-# ============================================================
-# PUBLIC — GET PACKAGE BY ID
-# ============================================================
-
-# IMPORTANT:
-# Keep this AFTER /admin routes.
-#
-# Example:
-#
-# GET /packages/1
-#
-# This endpoint currently calls get_package_by_id().
-#
-# NOTE:
-# get_package_by_id() currently returns both draft and
-# published packages. If this endpoint is public, consider
-# restricting it to published packages.
 
 
 @router.get(

@@ -26,6 +26,7 @@ from app.core.slugify import unique_slug
 
 CACHE_PREFIX = "packages"
 
+REGIONS = ("domestic", "international")
 
 # ============================================================
 # SERIALIZATION
@@ -75,6 +76,8 @@ def _serialize(pkg: Package) -> dict:
             if pkg.package_type
             else None
         ),
+
+        "region": pkg.region,
 
         # ----------------------------------------------------
         # Admin-controlled display order
@@ -413,33 +416,12 @@ def _invalidate_all_related_cache() -> None:
 def get_published_packages(
     db: Session,
     collection: Optional[str] = None,
+    region: Optional[str] = None,
+    package_type: Optional[str] = None,
 ) -> list[dict]:
-    """
-    Public endpoint.
-
-    Returns published packages.
-
-    Discovery collections:
-
-        /packages
-        /packages?collection=popular
-        /packages?collection=recommended
-        /packages?collection=trending
-        /packages?collection=featured
-        /packages?collection=new
-        /packages?collection=most_visited
-
-    Seasonal packages are NOT automatically excluded here.
-
-    If the public site needs a separate seasonal listing,
-    use get_published_seasonal_packages().
-    """
-
-    collection = (
-        collection.strip().lower()
-        if collection
-        else None
-    )
+    collection = collection.strip().lower() if collection else None
+    region = region.strip().lower() if region else None
+    package_type = package_type.strip().lower() if package_type else None
 
     collection_filters = {
         "popular": Package.is_popular,
@@ -450,64 +432,47 @@ def get_published_packages(
         "most_visited": Package.is_most_visited,
     }
 
-    if (
-        collection
-        and collection not in collection_filters
-    ):
+    if collection and collection not in collection_filters:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Invalid collection. "
-                "Allowed values: "
-                "popular, recommended, trending, "
-                "featured, new, most_visited."
-            ),
+            detail="Invalid collection. Allowed values: popular, recommended, "
+                   "trending, featured, new, most_visited.",
         )
 
-    if collection:
-        cache_key = (
-            f"{CACHE_PREFIX}:published:{collection}"
-        )
-    else:
-        cache_key = f"{CACHE_PREFIX}:published"
+    if region and region not in REGIONS:
+        raise HTTPException(status_code=400, detail="Invalid region")
+
+    type_value = None
+    if package_type:
+        try:
+            type_value = PackageTypeEnum(package_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid package type")
+
+    cache_key = ":".join([
+        CACHE_PREFIX, "published",
+        collection or "all", region or "all", package_type or "all",
+    ])
 
     cached = cache_get(cache_key)
-
     if cached is not None:
         return cached
 
-    query = (
-        db.query(Package)
-        .filter(
-            Package.status
-            == StatusEnum.published
-        )
-    )
+    query = db.query(Package).filter(Package.status == StatusEnum.published)
 
     if collection:
-        query = query.filter(
-            collection_filters[collection].is_(True)
-        )
+        query = query.filter(collection_filters[collection].is_(True))
+    if region:
+        query = query.filter(Package.region == region)
+    if type_value:
+        query = query.filter(Package.package_type == type_value)
 
-    packages = (
-        query
-        .order_by(
-            Package.display_order.asc(),
-            Package.created_at.desc(),
-        )
-        .all()
-    )
+    packages = query.order_by(
+        Package.display_order.asc(), Package.created_at.desc()
+    ).all()
 
-    data = [
-        _serialize(package)
-        for package in packages
-    ]
-
-    cache_set(
-        cache_key,
-        data,
-    )
-
+    data = [_serialize(p) for p in packages]
+    cache_set(cache_key, data)
     return data
 
 
@@ -735,54 +700,17 @@ def get_package_by_slug(
     return data
 
 
-# ============================================================
-# ADMIN — GET ALL PACKAGES
-# ============================================================
-
-
-# def get_all_packages_admin(
-#     db: Session,
-# ) -> list[dict]:
-#     """
-#     Admin/creator view.
-
-#     Includes:
-#         - draft packages
-#         - published packages
-#         - normal packages
-#         - seasonal packages
-#     """
-
-#     packages = (
-#         db.query(Package)
-#         .order_by(
-#             Package.display_order.asc(),
-#             Package.created_at.desc(),
-#         )
-#         .all()
-#     )
-
-#     return [
-#         _serialize(package)
-#         for package in packages
-#     ]
 
 def get_all_packages_admin(
-    db: Session,
-    skip: int = 0,
-    limit: int = 10,
-    search: Optional[str] = None,
-    status: Optional[str] = None,
-    package_type: Optional[str] = None,
-) -> dict:
-    """
-    Admin/creator view (paginated).
+    db, skip=0, limit=10, search=None, status=None,
+    package_type=None, region=None,) -> dict:
 
-    Includes draft + published, normal + seasonal packages.
-    Returns {"items": [...], "total": <count after filters>}.
-    """
+    query = db.query(Package) 
 
-    query = db.query(Package)
+    if region and region != "all":
+        if region not in REGIONS:
+            raise HTTPException(status_code=400, detail="Invalid region filter")
+        query = query.filter(Package.region == region)
 
     # ---------------------------------------------------------
     # Search: package title, legacy destination text, or the
@@ -904,21 +832,6 @@ def create_package(
     payload: PackageCreate,
     user_id: int,
 ) -> Package:
-    """
-    Create a new package.
-
-    BUSINESS RULE:
-
-        Normal package:
-            destination_id required
-            seasoned_destination_id must be NULL
-
-        Seasonal package:
-            seasoned_destination_id required
-            destination_id must be NULL
-
-    Exactly ONE destination relationship is allowed.
-    """
 
     # --------------------------------------------------------
     # Read destination IDs
@@ -987,6 +900,8 @@ def create_package(
             "seasoned_destination_id",
         }
     )
+
+    package_data["region"] = payload.region.value
 
     # --------------------------------------------------------
     # Requested position
@@ -1141,15 +1056,13 @@ def update_package(
         exclude_unset=True
     )
 
-    # --------------------------------------------------------
-    # Determine final destination state
-    # --------------------------------------------------------
-    #
-    # IMPORTANT:
-    # We need to calculate the FINAL state before applying
-    # updates, because changing from normal -> seasonal or
-    # seasonal -> normal requires clearing the other FK.
-    # --------------------------------------------------------
+    if "region" in update_data:
+        if update_data["region"] is None:
+            update_data.pop("region")        # column is NOT NULL
+        else:
+            update_data["region"] = update_data["region"].value
+
+    
 
     final_destination_id = (
         update_data.get(

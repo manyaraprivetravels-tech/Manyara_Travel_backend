@@ -18,6 +18,11 @@ class StatusEnum(str, Enum):
     published = "published"
 
 
+class RegionEnum(str, Enum):
+    domestic = "domestic"
+    international = "international"
+
+
 class PackageTypeEnum(str, Enum):
     pilgrimage = "pilgrimage"
     mountains_adventure = "mountains_adventure"
@@ -86,7 +91,7 @@ class PackageCreate(BaseModel):
     )
 
     # Authoritative relationship to most_visited.id
-    destination_id: Optional[int] = Field(
+    destination_id: Optional[int] = Field(default=None,
         gt=0,
     )
 
@@ -95,6 +100,8 @@ class PackageCreate(BaseModel):
         default=None,
         gt=0,
     )
+
+    region: RegionEnum = RegionEnum.domestic
 
     # ---------------------------------------------------------
     # Package classification
@@ -243,6 +250,8 @@ class PackageUpdate(BaseModel):
         default=None,
         gt=0,
     )
+
+    region: Optional[RegionEnum] = None
 
     # ---------------------------------------------------------
     # Package classification
@@ -421,6 +430,8 @@ class PackageOut(BaseModel):
     # ---------------------------------------------------------
 
     description: Optional[str] = None
+
+    region: RegionEnum
 
     # ---------------------------------------------------------
     # Images

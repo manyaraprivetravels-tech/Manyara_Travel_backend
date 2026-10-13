@@ -60,26 +60,7 @@ class Package(Base):
         nullable=False,
     )
 
-    # ---------------------------------------------------------
-    # Destination
-    # ---------------------------------------------------------
-    #
-    # A package belongs to EXACTLY ONE:
-    #
-    # 1. Normal destination
-    #       destination_id -> most_visited.id
-    #
-    # OR
-    #
-    # 2. Seasonal destination
-    #       seasoned_destination_id -> seasoned_destinations.id
-    #
-    # The service layer enforces this XOR rule.
-    #
-    # `destination` is retained for backward compatibility and
-    # display/filtering. It is NULL for seasonal packages.
-    # ---------------------------------------------------------
-
+   
     destination = Column(
         String(150),
         nullable=True,
@@ -112,12 +93,24 @@ class Package(Base):
     # Package classification
     # ---------------------------------------------------------
 
+
+    region = Column(
+            String(20),
+            nullable=False,
+            default="domestic",
+            server_default="domestic",
+            index=True,
+        )
+    
     package_type = Column(
         Enum(PackageTypeEnum),
         nullable=False,
         index=True,
         default=PackageTypeEnum.family,
     )
+
+
+   
 
     # ---------------------------------------------------------
     # Display ordering
