@@ -1,6 +1,3 @@
-
-
-
 from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 
@@ -8,7 +5,7 @@ from app.db.database import get_db
 from app.schemas.user import UserCreate, UserLogin, UserOut, Token
 from app.services import auth_service
 from app.core.deps import get_current_user, require_admin
-from app.models.user import User, RoleEnum
+from app.models.user import User
 from app.core.security import create_access_token
 
 from datetime import datetime, timezone
@@ -36,8 +33,12 @@ def register(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    """Only an existing admin can create new users (admin or creator)."""
-    return auth_service.register_user(db, payload)
+    """Only an existing admin can create new users (admin or creator).
+
+    The logged-in admin is passed down so that creating another admin is
+    verified against THEIR password.
+    """
+    return auth_service.register_user(db, payload, admin)
 
 
 @router.post("/login", response_model=Token)
@@ -47,17 +48,17 @@ def login(
 ):
     user, token = auth_service.authenticate_user(db, payload)
 
-    # Start the 30-minute inactivity period
-    if user.role in (RoleEnum.admin, RoleEnum.creator):
-        user.last_activity_at = datetime.now(timezone.utc)
+    # Build the response BEFORE committing. After a commit SQLAlchemy
+    # expires the object, and reading it again costs an extra SELECT
+    # (that is what db.refresh(user) was doing).
+    user_out = UserOut.model_validate(user)
 
-        db.commit()
-        db.refresh(user)
+    # Start the 30-minute inactivity period (admins and creators are the
+    # only roles, so no role check is needed).
+    user.last_activity_at = datetime.now(timezone.utc)
+    db.commit()
 
-    return Token(
-        access_token=token,
-        user=UserOut.model_validate(user),
-    )
+    return Token(access_token=token, user=user_out)
 
 
 @router.get("/me", response_model=UserOut)
@@ -134,8 +135,3 @@ def heartbeat(current_user: User = Depends(get_current_user)):
         {"sub": str(current_user.id), "role": current_user.role.value}
     )
     return {"access_token": token, "token_type": "bearer"}
- 
-
-
-
-

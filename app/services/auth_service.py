@@ -6,7 +6,22 @@ from app.schemas.user import UserCreate, UserLogin
 from app.core.security import hash_password, verify_password, create_access_token
 
 
-def register_user(db: Session, payload: UserCreate) -> User:
+def register_user(db: Session, payload: UserCreate, current_admin: User) -> User:
+    """
+    Create a new admin or creator.
+
+    `current_admin` is the admin who is making this request (injected by
+    require_admin in the route). Creating another admin must be authorised
+    with THAT admin's own password, not the password of whichever admin
+    happens to be first in the table.
+    """
+    # The frontend checks this too, but the server must not trust the client.
+    if payload.password != payload.confirm_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Password and Confirm Password do not match",
+        )
+
     existing = (
         db.query(User)
         .filter(User.email == payload.email)
@@ -21,37 +36,24 @@ def register_user(db: Session, payload: UserCreate) -> User:
 
     # =========================================================
     # ADMIN REGISTRATION
-    # An existing active admin must authorize creation
+    # The logged-in admin must confirm with their own password.
     # =========================================================
     if payload.role == RoleEnum.admin:
         if not payload.admin_verification_password:
             raise HTTPException(
                 status_code=400,
-                detail="Existing admin password is required",
+                detail="Your admin password is required",
             )
 
-        existing_admin = (
-            db.query(User)
-            .filter(
-                User.role == RoleEnum.admin,
-                User.is_active == True,
-            )
-            .first()
-        )
-
-        if not existing_admin:
-            raise HTTPException(
-                status_code=400,
-                detail="No existing admin account available for verification",
-            )
-
+        # 403, not 401: the frontend treats ANY 401 on an authenticated
+        # request as an expired session and logs the user out.
         if not verify_password(
             payload.admin_verification_password,
-            existing_admin.password_hash,
+            current_admin.password_hash,
         ):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid existing admin password",
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid admin password",
             )
 
     # =========================================================
@@ -69,6 +71,7 @@ def register_user(db: Session, payload: UserCreate) -> User:
     db.refresh(user)
 
     return user
+
 
 def authenticate_user(db: Session, payload: UserLogin) -> tuple[User, str]:
     user = db.query(User).filter(User.email == payload.email).first()
