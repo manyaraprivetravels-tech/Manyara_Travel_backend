@@ -27,20 +27,6 @@ router = APIRouter(
 )
 
 
-# ============================================================
-# PUBLIC - LIST PUBLISHED TESTIMONIALS
-# ============================================================
-#
-# GET /testimonials
-#
-# Returns only published testimonials.
-#
-# Used by:
-# - Testimonials page
-# - Homepage testimonial section
-# - Review cards
-#
-# ============================================================
 
 
 @router.get(

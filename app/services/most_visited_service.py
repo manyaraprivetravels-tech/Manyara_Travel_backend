@@ -185,37 +185,85 @@ def _invalidate_cache() -> None:
     cache_delete_pattern(f"{CACHE_PREFIX}:*")
 
 
-def get_all_most_visited(
-    db: Session,
-) -> list[dict]:
-    """
-    Public homepage endpoint.
+# def get_all_most_visited(
+#     db: Session,
+# ) -> list[dict]:
+#     """
+#     Public homepage endpoint.
 
-    Returns published MostVisited destinations
-    ordered by display_order.
+#     Returns published MostVisited destinations
+#     ordered by display_order.
 
-    NOTE:
-    Packages are included for each destination.
-    """
+#     NOTE:
+#     Packages are included for each destination.
+#     """
 
+#     cache_key = f"{CACHE_PREFIX}:all"
+
+#     cached = cache_get(cache_key)
+
+#     if cached is not None:
+#         return cached
+
+#     items = (
+#         db.query(MostVisited)
+#         .filter(MostVisited.status == "published")
+#         .order_by(MostVisited.display_order.asc())
+#         .all()
+#     )
+
+#     data = [_serialize(db, item) for item in items]
+
+#     cache_set(cache_key, data)
+
+#     return data
+
+
+def get_all_most_visited(db: Session) -> list[dict]:
     cache_key = f"{CACHE_PREFIX}:all"
 
     cached = cache_get(cache_key)
-
     if cached is not None:
         return cached
 
-    items = (
-        db.query(MostVisited)
+    # Lowest published package price per destination, in the same query
+    price_sq = (
+        db.query(
+            Package.destination_id.label("destination_id"),
+            func.min(Package.price).label("min_price"),
+        )
+        .filter(Package.status == "published")
+        .group_by(Package.destination_id)
+        .subquery()
+    )
+
+    rows = (
+        db.query(MostVisited, price_sq.c.min_price)
+        .outerjoin(price_sq, price_sq.c.destination_id == MostVisited.id)
         .filter(MostVisited.status == "published")
         .order_by(MostVisited.display_order.asc())
         .all()
     )
 
-    data = [_serialize(db, item) for item in items]
+    data = []
+    for m, min_price in rows:
+        own = m.starting_from
+        price = own if own is not None else min_price
+        data.append(
+            {
+                "id": m.id,
+                "place_name": m.place_name,
+                "slug": m.slug,
+                "image": m.image,
+                "description": m.description,
+                "best_time_to_visit": m.best_time_to_visit,
+                "starting_from": str(price) if price is not None else None,
+                "display_order": m.display_order,
+                "status": m.status.value if hasattr(m.status, "value") else m.status,
+            }
+        )
 
     cache_set(cache_key, data)
-
     return data
 
 
