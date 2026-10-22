@@ -84,25 +84,68 @@ def authenticate_user(db: Session, payload: UserLogin) -> tuple[User, str]:
 
     token = create_access_token({"sub": str(user.id), "role": user.role.value})
     return user, token
+def list_users(db: Session, role: RoleEnum | None = None) -> list[User]:
+    q = db.query(User)
+    if role:
+        q = q.filter(User.role == role)
+    return q.order_by(User.id.desc()).all()
 
 
 def list_creators(db: Session) -> list[User]:
-    return db.query(User).filter(User.role == RoleEnum.creator).all()
+    # kept so any other code that imports it still works
+    return list_users(db, RoleEnum.creator)
 
 
-def set_user_active_status(db: Session, user_id: int, is_active: bool) -> User:
+def _active_admin_count(db: Session) -> int:
+    return (
+        db.query(User)
+        .filter(User.role == RoleEnum.admin, User.is_active.is_(True))
+        .count()
+    )
+
+
+def set_user_active_status(
+    db: Session, user_id: int, is_active: bool, current_admin: User
+) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if user.id == current_admin.id:
+        raise HTTPException(status_code=400, detail="You can't change your own status.")
+
+    if (
+        user.role == RoleEnum.admin
+        and user.is_active
+        and not is_active
+        and _active_admin_count(db) <= 1
+    ):
+        raise HTTPException(
+            status_code=400, detail="You can't disable the last active admin."
+        )
+
     user.is_active = is_active
     db.commit()
     db.refresh(user)
     return user
 
 
-def delete_user(db: Session, user_id: int) -> None:
+def delete_user(db: Session, user_id: int, current_admin: User) -> None:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if user.id == current_admin.id:
+        raise HTTPException(status_code=400, detail="You can't delete your own account.")
+
+    if (
+        user.role == RoleEnum.admin
+        and user.is_active
+        and _active_admin_count(db) <= 1
+    ):
+        raise HTTPException(
+            status_code=400, detail="You can't delete the last active admin."
+        )
+
     db.delete(user)
     db.commit()

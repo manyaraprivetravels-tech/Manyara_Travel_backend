@@ -1,12 +1,9 @@
 from datetime import datetime
 from enum import Enum
 
+from app.models.user import RoleEnum
+
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
-
-
-class RoleEnum(str, Enum):
-    admin = "admin"
-    creator = "creator"
 
 
 class UserCreate(BaseModel):
@@ -39,7 +36,8 @@ class UserOut(BaseModel):
     email: EmailStr
     role: RoleEnum
     is_active: bool
-    created_at: datetime
+    created_at: datetime | None=None 
+    last_activity_at: datetime | None = None
 
 
 class Token(BaseModel):

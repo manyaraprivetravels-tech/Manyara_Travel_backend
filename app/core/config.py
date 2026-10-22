@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # Public-facing site info, used as defaults for /settings until an admin
     # edits them from the Website Settings admin page.
     WHATSAPP_NUMBER: str = ""
-    SITE_URL: str = "https://manyaraprive.com"
+    SITE_URL: str = "https://manyaraprivevacations.com"
 
     RESET_SESSION_EXPIRY_MINUTES: int = 10
 

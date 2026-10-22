@@ -1,6 +1,8 @@
+
+
 import enum
 from sqlalchemy import Column, Integer, String, Enum, DateTime, Boolean
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func,expression
 from app.db.database import Base
 
 
@@ -16,7 +18,10 @@ class User(Base):
     name = Column(String(100), nullable=False)
     email = Column(String(150), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(Enum(RoleEnum), default=RoleEnum.creator, nullable=False)
-    is_active = Column(Boolean, default=True)
+    role = Column(Enum(RoleEnum, native_enum=False), default=RoleEnum.creator, nullable=False)
+    is_active = Column(Boolean, default=True,nullable=False,server_default=expression.true())
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_activity_at = Column(DateTime(timezone=True),nullable=True,)
+
+
+

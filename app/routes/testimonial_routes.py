@@ -39,22 +39,6 @@ def list_published(
     return testimonial_service.get_published_testimonials(db)
 
 
-# ============================================================
-# PUBLIC - CREATE TESTIMONIAL
-# ============================================================
-#
-# POST /testimonials
-#
-# Public visitors can submit reviews.
-#
-# The service automatically:
-# - generates slug
-# - sets status = draft
-# - sets display_order = 0
-# - sets created_by = None
-#
-# ============================================================
-
 
 @router.post(
     "",
@@ -71,18 +55,6 @@ def create_public(
     )
 
 
-# ============================================================
-# ADMIN - GET ALL TESTIMONIALS
-# ============================================================
-#
-# GET /testimonials/admin/all
-#
-# Includes:
-# - draft
-# - published
-#
-# ============================================================
-
 
 @router.get(
     "/admin/all",
@@ -94,16 +66,6 @@ def list_all(
 ):
     return testimonial_service.get_all_testimonials_admin(db)
 
-
-# ============================================================
-# ADMIN - CREATE TESTIMONIAL
-# ============================================================
-#
-# POST /testimonials/admin
-#
-# Slug is generated automatically by the service.
-#
-# ============================================================
 
 
 @router.post(
@@ -123,15 +85,6 @@ def create(
     )
 
 
-# ============================================================
-# ADMIN - UPDATE TESTIMONIAL
-# ============================================================
-#
-# PUT /testimonials/admin/{item_id}
-#
-# The existing slug remains unchanged.
-#
-# ============================================================
 
 
 @router.put(
@@ -151,14 +104,6 @@ def update(
     )
 
 
-# ============================================================
-# ADMIN - DELETE TESTIMONIAL
-# ============================================================
-#
-# DELETE /testimonials/admin/{item_id}
-#
-# ============================================================
-
 
 @router.delete(
     "/admin/{item_id}",
@@ -177,24 +122,6 @@ def delete(
     return None
 
 
-# ============================================================
-# PUBLIC - GET SINGLE TESTIMONIAL BY SLUG
-# ============================================================
-#
-# GET /testimonials/{slug}
-#
-# IMPORTANT:
-# This route is placed AFTER all /admin routes.
-#
-# Only published testimonials are returned.
-#
-# Used by:
-# /reviews/:slug
-#
-# Example:
-# GET /testimonials/rahul-kumar-kashmir
-#
-# ============================================================
 
 
 @router.get(
