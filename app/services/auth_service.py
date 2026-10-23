@@ -1,9 +1,33 @@
-from sqlalchemy.orm import Session
+import logging
+
 from fastapi import HTTPException, status
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.models.user import User, RoleEnum
 from app.schemas.user import UserCreate, UserLogin
 from app.core.security import hash_password, verify_password, create_access_token
+
+logger = logging.getLogger(__name__)
+
+
+def _normalize_email(email: str) -> str:
+    """Emails are compared trimmed and lower-case.
+
+    Phones often auto-capitalise the first letter ("Admin@..."), and the
+    database comparison is case-sensitive, so the same address would be
+    "not found".
+    """
+    return str(email).strip().lower()
+
+
+def _password_matches(plain: str, hashed: str) -> bool:
+    try:
+        return verify_password(plain, hashed)
+    except (ValueError, TypeError):
+        # A broken/unknown hash, or a password bcrypt cannot handle
+        logger.exception("Password check raised an error")
+        return False
 
 
 def register_user(db: Session, payload: UserCreate, current_admin: User) -> User:
@@ -22,9 +46,11 @@ def register_user(db: Session, payload: UserCreate, current_admin: User) -> User
             detail="Password and Confirm Password do not match",
         )
 
+    email = _normalize_email(payload.email)
+
     existing = (
         db.query(User)
-        .filter(User.email == payload.email)
+        .filter(func.lower(User.email) == email)
         .first()
     )
 
@@ -61,7 +87,7 @@ def register_user(db: Session, payload: UserCreate, current_admin: User) -> User
     # =========================================================
     user = User(
         name=payload.name,
-        email=payload.email,
+        email=email,
         password_hash=hash_password(payload.password),
         role=payload.role,
     )
@@ -74,16 +100,34 @@ def register_user(db: Session, payload: UserCreate, current_admin: User) -> User
 
 
 def authenticate_user(db: Session, payload: UserLogin) -> tuple[User, str]:
-    user = db.query(User).filter(User.email == payload.email).first()
-    if not user or not verify_password(payload.password, user.password_hash):
+    email = _normalize_email(payload.email)
+
+    # func.lower also finds older rows that were saved with capital letters
+    user = db.query(User).filter(func.lower(User.email) == email).first()
+
+    # The client always gets the same message. The REAL reason goes to the
+    # server log, so you can tell the two cases apart in Render.
+    if user is None:
+        logger.warning("Login failed: no account for %s", email)
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
         )
+
+    if not _password_matches(payload.password, user.password_hash):
+        logger.warning("Login failed: wrong password for user id %s", user.id)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled")
 
     token = create_access_token({"sub": str(user.id), "role": user.role.value})
     return user, token
+
+
 def list_users(db: Session, role: RoleEnum | None = None) -> list[User]:
     q = db.query(User)
     if role:

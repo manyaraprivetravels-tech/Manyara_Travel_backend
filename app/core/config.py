@@ -56,17 +56,3 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-
-
-
-
-
-
-    # # Email message settings
-    # SMTP_HOST: str = "smtp.gmail.com"
-    # SMTP_PORT: int = 587
-    # SMTP_USERNAME: str
-    # SMTP_PASSWORD: str
-    # #Manyara backend
-    # SMTP_USE_TLS: bool = True
-    # EMAIL_FROM: str
